@@ -1,8 +1,10 @@
-# 客户流失预警与联系优先级分析
+# Customer Churn Prediction and Retention Prioritization
 
-基于 scikit-learn 随机森林和 Streamlit 的本地演示项目。新增「每月只能联系 500 人」策略比较，可调整名额、价值月数、毛利率、挽留成功率和联系成本，导出名单及成本敏感性结果。
+A local demonstration built with scikit-learn's Random Forest classifier and Streamlit. The retention planner explores a practical question: **If a customer service team can contact only 500 customers per month, who should they prioritize?**
 
-## 本地启动
+Compare three outreach strategies, adjust capacity and economic assumptions, and export customer rankings and cost sensitivity results.
+
+## Run Locally
 
 ```bash
 python3 -m venv .venv
@@ -10,38 +12,66 @@ python3 -m venv .venv
 .venv/bin/python -m streamlit run dashboard/app.py
 ```
 
-已安装环境的 macOS 用户也可以双击 `Start Churn Dashboard.command`。打开网页后，在左侧 Navigate 中选择「🎯 联系优先级」。本地验证环境：Python 3.14；锁定依赖见 requirements-local.lock.txt。
+On macOS, once the environment is installed, you can also double-click `Start Churn Dashboard.command`.
 
-## 新增功能与方法
+In the sidebar's **Navigate** menu, select **🎯 联系优先级** (Contact Prioritization). The new planner's interface is currently in Chinese.
 
-- 比较随机联系（固定种子 42）、流失风险优先、风险与客户价值综合排序。
-- 仅使用固定 80/20 分层划分中的 20% 测试客户做策略回测，模型没有在这些客户上训练；左侧筛选只缩小候选池。
-- 输出联系人数、覆盖实际流失人数、实际流失覆盖率、名单流失率、模拟挽留人数、联系成本和模拟净收益。
-- 价值代理 = 月费 × 保留月数 × 毛利率。
-- 单人模拟净收益 = 流失概率 × 假设挽留成功率 × 价值代理 − 联系成本。
-- 综合策略按单人模拟净收益排序。所有策略取 min(名额, 候选人数)，包括净收益为负的情况；这是相同名额的比较，不是建议在负收益下仍联系。
-- 联系成本等假设对所有客户相同，因此改变统一成本不会改变排序；敏感性图展示收益变化。客户级成本与干预效果需要额外数据。
-- 导出 CSV 包含模拟假设；实际标签仅用于回测，不参与模型输入和排序。
+Locally verified with Python 3.14. Exact dependency versions are recorded in [requirements-local.lock.txt](requirements-local.lock.txt).
 
-## 重要局限
+## Features and Methodology
 
-高流失风险不等于容易挽留。成功率是用户假设，没有干预实验支持；随机森林概率尚未校准，模拟收益不是已实现收益。价值估计不是完整 LTV。数据是历史截面数据，不能证明未来月份的效果。重复查看测试集后，需要新的独立数据或时间外验证。
+- Compare random outreach (fixed seed of 42), highest churn risk first, and a combined risk-and-value strategy.
+- Evaluate strategies exclusively on the 20% holdout set from a fixed, stratified 80/20 train/test split. The model is not trained on these customers. Sidebar filters narrow the candidate pool.
+- Adjust the contact limit, value horizon, gross margin, assumed retention success rate, and cost per contact.
+- Report contact count, actual churners reached, actual churn coverage, churn rate within the selected list, simulated retained customers, total contact cost, and simulated net benefit.
+- Export priority lists and cost sensitivity comparisons as CSV files, with the simulation assumptions included.
+- Use actual churn labels only for retrospective evaluation, never as model inputs or ranking criteria.
 
-保留的原始单客户预测页面只填写部分输入，未填写的服务字段沿用第一行样本；该页仍是示例，不宜直接用于实际运营。原始 Notebook 保留作参考，未同步重做其分析或结果；修正及新功能位于 dashboard/。
+### Economic Assumptions
 
-## 本次修改
+```text
+Customer value proxy = Monthly charge × Value horizon in months × Gross margin
 
-- 修复将 Churn 标签作为特征造成的目标泄漏。
-- 兼容 pandas 字符串类型，更新 Streamlit 宽度参数。
-- 新增独立策略计算模块、中文交互页面及名单导出。
-- 添加本地启动入口、依赖锁定、策略与页面验证。
+Simulated net benefit per customer =
+    Churn probability × Assumed retention success rate × Customer value proxy
+    − Contact cost
+```
 
-## 验证
+The retention success rate represents the assumed fraction of contacted customers who would otherwise churn but are retained through the intervention.
+
+The combined strategy ranks customers by simulated net benefit. Each strategy selects `min(contact limit, candidate count)` customers, even when simulated net benefit is negative. This provides an equal-capacity comparison; it is not a recommendation to contact customers when doing so is unprofitable.
+
+Contact cost and the other economic assumptions are uniform across customers. Changing a uniform contact cost changes simulated benefit but does not change the ranking. The sensitivity chart illustrates this effect. Customer-specific costs and intervention effects require additional data.
+
+Actual churn coverage is the number of actual churners in the selected list divided by all actual churners in the filtered candidate pool. It is left undefined when the pool contains no actual churners.
+
+## Limitations
+
+High churn risk does not imply that a customer is easy to retain. The retention success rate is a user-specified assumption, unsupported by intervention experiments. Random Forest probabilities have not been calibrated, and simulated benefits are not realized returns. The customer value proxy is not a complete lifetime value estimate.
+
+The dataset is a historical snapshot, so this demonstration cannot establish performance for future months. Repeated inspection of the test set requires subsequent validation on fresh independent data or a later time period.
+
+The original single-customer prediction page exposes only some input fields. Unspecified service fields retain values from the first dataset row. That page remains a demonstration and is not suitable for direct operational use.
+
+The original notebook is retained for reference; its analysis and results have not been revised to reflect these changes. The corrected application and new functionality are in `dashboard/`.
+
+## Changes from the Original Project
+
+- Removed the `Churn` label from model features to fix target leakage.
+- Added support for pandas string dtypes and updated Streamlit width parameters.
+- Added an independent strategy calculation module, a Chinese-language retention planner, and customer list exports.
+- Added a macOS launcher, a dependency lock file, and tests for strategy calculations and dashboard interactions.
+
+## Validation
 
 ```bash
 .venv/bin/python -m unittest discover -s tests -v
 ```
 
-## 来源与许可
+Tests cover ranking behavior, economic calculations, label-independent selection, capacity limits, empty candidate pools, zero assumed retention success, uniform cost changes, and dashboard interactions.
 
-本项目改编自 [Ayushman Das 的 Telco Customer Churn Analytics and Prediction](https://github.com/ayushmandas29/Telco-Customer-Churn-Analytics-and-Prediction)。保留原 Git 历史和 MIT LICENSE。原作者说明存于 README_UPSTREAM.md，其中在线演示链接属于原作者，不是本次新增版本。仓库自带的清洗数据与原始 Notebook 来自上游。
+## Attribution and License
+
+Adapted from [Ayushman Das's Telco Customer Churn Analytics and Prediction](https://github.com/ayushmandas29/Telco-Customer-Churn-Analytics-and-Prediction).
+
+The original Git history and [MIT license](LICENSE) are preserved. The upstream README is retained in [README_UPSTREAM.md](README_UPSTREAM.md); its live demo link points to the original author's application, not this extended version. The bundled cleaned dataset and original notebook are also inherited from the upstream project.
